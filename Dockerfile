@@ -1,7 +1,7 @@
 # syntax=docker/dockerfile:1
 
 # ---- Build the server and the CLI
-FROM node:22-alpine AS build
+FROM node:25-alpine AS build
 WORKDIR /app
 COPY package.json package-lock.json ./
 COPY packages/core/package.json packages/core/
@@ -15,7 +15,7 @@ COPY apps apps
 RUN npm run build -w @witness/server -w @witness/cli
 
 # ---- The server's production dependencies only
-FROM node:22-alpine AS prod-deps
+FROM node:25-alpine AS prod-deps
 WORKDIR /app
 COPY package.json package-lock.json ./
 COPY packages/core/package.json packages/core/
@@ -25,7 +25,7 @@ COPY apps/server/package.json apps/server/
 RUN npm ci --omit=dev --workspace=@witness/server
 
 # ---- Runtime: the server bundle, its dependencies, and the witness CLI for operators
-FROM node:22-alpine AS runtime
+FROM node:25-alpine AS runtime
 ENV NODE_ENV=production PORT=4000
 WORKDIR /app
 COPY --from=prod-deps /app/node_modules ./node_modules
