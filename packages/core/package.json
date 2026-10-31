@@ -1,0 +1,17 @@
+{
+  "name": "@witness/core",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "The Witness log format: canonical JSON, hash chaining, redaction and signed checkpoints.",
+  "license": "MIT",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "zod": "^4.6.7"
+  }
+}

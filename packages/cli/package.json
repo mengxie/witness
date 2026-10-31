@@ -1,0 +1,25 @@
+{
+  "name": "@witness/cli",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "witness: verify an audit log end to end, and generate signing keys.",
+  "license": "MIT",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "build": "node build.mjs"
+  },
+  "dependencies": {
+    "@witness/core": "^1.0.0",
+    "@witness/sdk": "^1.0.0"
+  },
+  "bin": {
+    "witness": "dist/witness.js"
+  },
+  "devDependencies": {
+    "esbuild": "^0.28.2"
+  }
+}

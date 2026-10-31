@@ -1,0 +1,35 @@
+# docker compose up --build   (needs WITNESS_SIGNING_KEY and WITNESS_ADMIN_TOKEN in .env)
+name: witness
+
+services:
+  db:
+    image: postgres:18-alpine
+    environment:
+      POSTGRES_USER: witness
+      POSTGRES_PASSWORD: witness
+      POSTGRES_DB: witness
+    ports:
+      - '5432:5432'
+    volumes:
+      - db-data:/var/lib/postgresql
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U witness -d witness']
+      interval: 3s
+      timeout: 3s
+      retries: 20
+
+  app:
+    build: .
+    environment:
+      DATABASE_URL: postgres://witness:witness@db:5432/witness
+      WITNESS_SIGNING_KEY: ${WITNESS_SIGNING_KEY:?Create one with "npm run witness -- keygen" and put it in .env}
+      WITNESS_ADMIN_TOKEN: ${WITNESS_ADMIN_TOKEN:?Set an admin token of at least 32 characters in .env}
+      WITNESS_CHECKPOINT_INTERVAL_SECONDS: ${WITNESS_CHECKPOINT_INTERVAL_SECONDS:-300}
+    ports:
+      - '4000:4000'
+    depends_on:
+      db:
+        condition: service_healthy
+
+volumes:
+  db-data:

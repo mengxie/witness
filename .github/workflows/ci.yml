@@ -1,0 +1,76 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    name: Lint, typecheck, test, build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    services:
+      postgres:
+        image: postgres:18-alpine
+        env:
+          POSTGRES_USER: witness
+          POSTGRES_PASSWORD: witness
+          POSTGRES_DB: witness_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U witness -d witness_test"
+          --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      DATABASE_URL: postgres://witness:witness@localhost:5432/witness_test
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      - run: npm run format:check
+      - run: npm run lint
+      - run: npm run typecheck
+      - run: npm run test:coverage
+      - run: npm run build
+
+  container:
+    name: Container end-to-end
+    needs: verify
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+      - name: Generate a throwaway signing key and admin token
+        run: |
+          node -e "const { generateKeyPairSync, randomBytes } = require('node:crypto');
+            const pem = generateKeyPairSync('ed25519').privateKey.export({ type: 'pkcs8', format: 'pem' });
+            console.log('WITNESS_SIGNING_KEY=' + Buffer.from(pem).toString('base64'));
+            console.log('WITNESS_ADMIN_TOKEN=' + randomBytes(32).toString('hex'));" > .env
+      - name: Start the stack and wait until healthy
+        run: docker compose up --detach --build --wait
+      - name: Record events and verify them with the bundled CLI
+        run: |
+          set -a; . ./.env; set +a
+          KEY=$(curl -sf -X POST localhost:4000/admin/tenants -H "authorization: Bearer $WITNESS_ADMIN_TOKEN" \
+            -H 'content-type: application/json' -d '{"name":"CI"}' | jq -r .apiKey)
+          curl -sf -X POST localhost:4000/v1/events -H "authorization: Bearer $KEY" -H 'content-type: application/json' \
+            -d '{"events":[{"action":"user.login","actor":{"id":"u1"}},{"action":"invoice.paid","actor":{"id":"u1"}}]}'
+          curl -sf -X POST localhost:4000/v1/checkpoints -H "authorization: Bearer $KEY"
+          docker compose exec -T app node witness.js verify --url http://127.0.0.1:4000 --api-key "$KEY"
+      - name: Show logs
+        if: always()
+        run: docker compose logs app
+      - name: Stop
+        if: always()
+        run: docker compose down --volumes
